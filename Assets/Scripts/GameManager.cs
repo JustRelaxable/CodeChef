@@ -1,12 +1,13 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
     public List<MovementCard> movementCards;
     public GameObject Chef;
-
+    public Text commandText;
     private void Awake()
     {
         movementCards = new List<MovementCard>();
@@ -19,13 +20,7 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        string s = "";
-        foreach (var item in movementCards)
-        {
-            s += item.CardName + " ";           
-        }
-        Debug.LogWarning(s);
-
+        Debug.Log(Chef.transform.parent.TransformVector(Chef.transform.right));
         if (Input.GetKeyDown(KeyCode.C))
         {
             GoForward();
@@ -38,16 +33,32 @@ public class GameManager : MonoBehaviour
         {
             Turn("RIGHT");
         }
+        if (Input.GetKeyDown(KeyCode.N))
+        {
+            Test();
+        }
+    }
+
+    private void UpdateCommandTextBox()
+    {
+        string s = "";
+        foreach (var item in movementCards)
+        {
+            s += item.CardName + "\n";
+        }
+        commandText.text = s;
     }
 
     public void AddCard(string cardName)
     {
         movementCards.Add(new MovementCard(cardName));
+        UpdateCommandTextBox();
     }
 
     public void RemoveCard(string cardName)
     {
         movementCards.Remove(movementCards.Find(x => x.CardName == cardName));
+        UpdateCommandTextBox();
     }
 
     public void StartSeen()
@@ -64,10 +75,7 @@ public class GameManager : MonoBehaviour
                     case "WALK":
                         if (isLoopEnabled)
                         {
-                            for (int j = 0; j < loopCount; j++)
-                            {
-                                GoForward();
-                            }
+                            StartCoroutine(GoForwardLoop(loopCount));
                         }
                         else
                         {
@@ -169,7 +177,30 @@ public class GameManager : MonoBehaviour
 
     public void GoForward()
     {
-        Chef.transform.position -= Chef.transform.right / 1.5f;
+        var factor = Chef.transform.InverseTransformVector(Chef.transform.parent.right);
+        factor = new Vector3(factor.x, factor.y, -factor.z);
+
+        var startingPos = Chef.transform.localPosition;
+        var finalPos = Chef.transform.localPosition -= factor * 0.66f;
+        StartCoroutine(SmoothLerp(1f,startingPos,finalPos));
+    }
+
+    public IEnumerator GoForwardLoop(int loopTime)
+    {
+        for (int i = 0; i < loopTime; i++)
+        {
+            var factor = Chef.transform.InverseTransformVector(Chef.transform.parent.right);
+            factor = new Vector3(factor.x, factor.y, -factor.z);
+
+            var startingPos = Chef.transform.localPosition;
+            var finalPos = Chef.transform.localPosition -= factor * 0.66f;
+            yield return SmoothLerp(1f, startingPos, finalPos);
+        }
+    }
+
+    public void Test()
+    {
+        StartCoroutine(GoForwardLoop(4));
     }
 
     public void Turn(string argument)
@@ -182,6 +213,18 @@ public class GameManager : MonoBehaviour
             case "LEFT":
                 Chef.transform.rotation *= Quaternion.Euler(0, -90, 0);
                 break;
+        }
+    }
+
+    private IEnumerator SmoothLerp(float time,Vector3 startingPos,Vector3 finalPos)
+    {
+        float elapsedTime = 0;
+
+        while (elapsedTime < time)
+        {
+            Chef.transform.localPosition = Vector3.Lerp(startingPos, finalPos, (elapsedTime / time));
+            elapsedTime += Time.deltaTime;
+            yield return null;
         }
     }
 }
